@@ -74,7 +74,7 @@ function regress_psql() {
 
     PGPORT=$(awk -F '=' '/PGPORT=/ { print $2; }' "$pglog")
     PGHOST=$(awk -F '=' '/PGHOST=/ { print $2; }' "$pglog")
-    connstr="host='$PGHOST' port=$PGPORT dbname='$USER'"
+    connstr="host='$PGHOST' port=$PGPORT dbname='postgres'"
     echo "connstr: \"$connstr\""
-    psql "$connstr"
+    psql "$connstr" "$@"
 }
