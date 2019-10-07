@@ -1,0 +1,80 @@
+function pgbuild() {
+    if ! [ -e src/include/pg_config_manual.h ]
+    then
+        echo "not postgres directory?"
+        return
+    fi
+    local destname="${1:-"$(basename $(pwd))"}"
+    local dest="$HOME/pg/$destname"
+    echo "configuring for $dest"
+    CFLAGS="-ggdb3 -O0" ./configure --quiet --cache-file=config.cache --prefix="$dest" --enable-debug --enable-cassert --enable-tap-tests --enable-dtrace && \
+    echo "configured, making" && \
+    make -s clean && \
+    make -s -j4 && make -s -C contrib -j4 && \
+    echo "compiled" && \
+    make -s install && make -s -C contrib install && \
+    echo "installed to $dest"
+}
+
+function extbuild() {
+    declare extlabel=${1?no ext descriptive label supplied}
+    declare extname=${2?no ext name specified}
+    declare extfile=${3?no file to test for presence of specified}
+    if [ -z "${4:-}" ]; then
+	echo 1>&2 "no target postgres version specified"
+	echo 1>&2 "candidates are:"
+	(cd $HOME/pg && find * -maxdepth 0 -type d) | sed 's/^/    /' 1>&2
+	echo 1>&2
+	return 1
+    fi
+    declare pgver=$4
+    shift 4
+
+    if ! [ -e ${extfile} ]; then
+	echo "not a ${extname} directory: no ${extfile}"
+	return
+    fi
+
+    declare destname="$HOME/pg/${pgver}"
+    if [ ! -e $destname/bin/psql ]; then
+	echo "no postgresql in $destname"
+	return
+    fi
+    local pgpath="${destname}/bin"
+    local newpath="${pgpath}:${PATH}"
+    echo "Using $pgpath"
+    echo "Targeting $(PATH=$newpath psql --version)"
+    PATH="$newpath" make -s "$@"
+    echo "rebuild and install done"
+}
+
+function pgl3build() {
+    extbuild "pglogical3" "pglogical" "pglogical.h" "$@"
+}
+
+function bdr3build() {
+    extbuild "bdr3" "bdr" "bdr.h" "$@"
+}
+
+alias pgl3make=pgl3build
+alias bdr3make=bdr3build
+
+export TPA_2Q_SUBSCRIPTION_TOKEN=k1S6u7zdOkDJWYSuuwbbEWF2QVOqoWB5
+
+# Launch a psql against a running pg_regress instance
+# without messing around reading the logs.
+#
+function regress_psql() {
+    local pglog='regression_output/log/postmaster.log'
+    if ! [ -e "$pglog" ]
+    then
+	echo "no log at $pglog"
+	return 1
+    fi
+
+    PGPORT=$(awk -F '=' '/PGPORT=/ { print $2; }' "$pglog")
+    PGHOST=$(awk -F '=' '/PGHOST=/ { print $2; }' "$pglog")
+    connstr="host='$PGHOST' port=$PGPORT dbname='$USER'"
+    echo "connstr: \"$connstr\""
+    psql "$connstr"
+}
