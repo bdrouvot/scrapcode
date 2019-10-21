@@ -65,16 +65,16 @@ export TPA_2Q_SUBSCRIPTION_TOKEN=k1S6u7zdOkDJWYSuuwbbEWF2QVOqoWB5
 # without messing around reading the logs.
 #
 function regress_psql() {
-    local pglog='regression_output/log/postmaster.log'
-    if ! [ -e "$pglog" ]
+    pgpidf="tmp_check/data/postmaster.pid"
+    if ! [ -e "$pgpidf" ]
     then
-	echo "no log at $pglog"
+	echo "no postmaster.pid at $pgpidf"
 	return 1
     fi
 
-    PGPORT=$(awk -F '=' '/PGPORT=/ { print $2; }' "$pglog")
-    PGHOST=$(awk -F '=' '/PGHOST=/ { print $2; }' "$pglog")
+    PGPORT="$(awk 'NR==4 { print $0; }' "$pgpidf")"
+    PGHOST="$(awk 'NR==5 { print $0; }' "$pgpidf")"
     connstr="host='$PGHOST' port=$PGPORT dbname='postgres'"
     echo "connstr: \"$connstr\""
-    psql "$connstr" "$@"
+    psql -v PROMPT1="%M:%> [%p] %n@%/=%# " -v PROMPT2="%M:%> [%p] %n@%/+%# " -q "$connstr" "$@"
 }
